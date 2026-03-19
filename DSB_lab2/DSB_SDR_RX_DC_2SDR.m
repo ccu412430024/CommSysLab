@@ -30,45 +30,30 @@ end
 decimation_factor = floor(SR / fs_proc);
 rx_baseband = downsample(rx_iq, decimation_factor);
 
-%% 4. 改進版：自動回推頻偏並修正
-fprintf('正在分析 DC 導頻以回推頻率偏差...\n');
+%% 4. 動態相位追蹤法 (Dynamic Squaring Loop)
+fprintf('啟動動態相位與頻率追蹤...\n');
 
-% [優化] 先用低通濾波器提取 DC 導頻，避免音樂干擾相位判斷
-% 這裡用一個非常窄的濾波器 (50Hz) 只抓 DC
-[b_dc, a_dc] = butter(2, 50 / (fs_proc/2)); 
-pilot_only = filtfilt(b_dc, a_dc, rx_baseband);
+% 1. 將基頻訊號平方，消除正負號影響，讓載波相位變成兩倍 (2*theta)
+rx_squared = rx_baseband .^ 2;
 
-% 1. 提取 DC 導頻的瞬時相位
-inst_phase = unwrap(angle(pilot_only));
+% 2. 【關鍵改進】設計一個極低頻的追蹤濾波器 (例如 10 Hz)
+% 我們不用 mean()，而是用濾波器濾除高頻的音樂變化，只留下隨時間緩慢漂移的頻率差！
+[b_track, a_track] = butter(2, 10 / (fs_proc/2));
+rx_squared_filtered = filtfilt(b_track, a_track, rx_squared);
 
-% 2. 計算相位變化率 (每取樣點旋轉的弧度)
-delta_phase = diff(inst_phase);
-mean_delta_p = mean(delta_phase); 
+% 3. 計算每個時間點的動態相位 (因為平方過，所以要除以 2)
+% 注意：現在的 theta_t 是一個長度與音樂相同的陣列，它會跟著時間不斷變化！
+theta_t = angle(rx_squared_filtered) / 2;
 
-% 3. 回推頻偏 (Hz)
-delta_f_est = (mean_delta_p * fs_proc) / (2 * pi);
-fprintf('偵測到硬體頻率偏差：%.2f Hz\n', delta_f_est);
+% 4. 將原始訊號乘上「隨時間變化的反向角度」，完美解開連續漂移
+rx_sync = rx_baseband .* exp(-1j * theta_t);
 
-% 4. 建立補償向量 (產生反向旋轉訊號)
-t_vec = (0:length(rx_baseband)-1).'; % 轉置成直向量
-compensation = exp(-1j * 2 * pi * delta_f_est * (t_vec / fs_proc));
-
-% 5. 一次性修正整段訊號
-rx_sync = rx_baseband .* compensation;
-
-% 6. 最後修正剩餘的固定相位偏移 (phi_0)，讓 DC 歸位到正 I 軸
-% 再次提取修正後的 DC 平均值
-final_phi = angle(mean(rx_sync));
-rx_sync = rx_sync * exp(-1j * final_phi);
-
-fprintf('相位與頻偏補償完成。\n');
-
-% 7. 進行 15kHz 音樂低通濾波
+% 5. 進行 15kHz 音樂低通濾波
 cutoff_freq = 15e3;
 [b_audio, a_audio] = butter(5, cutoff_freq / (fs_proc/2));
 rx_filtered = filtfilt(b_audio, a_audio, rx_sync);
 
-% 8. 取實部當作音樂
+% 6. 取實部當作音樂
 audio_demod = real(rx_filtered);
 
 %% --- 繪圖證明：DC 導頻相位追蹤效果視覺化 ---
