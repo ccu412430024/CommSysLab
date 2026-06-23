@@ -4,11 +4,11 @@ clc; clear; close all;
 %% 1. 參數設定 (System Parameters)
 Fs = 122.88e6;             % 取樣率 (Hz)
 CenterFreq_MHz = 433;      % 載波頻率 (MHz)
-TX_Power_dBm = 0;          % 發射功率 (dBm) - 根據簡報 P.6 修改
+TX_Power_dBm = 10;          % 發射功率 (dBm) - 根據簡報 P.6 修改
 
 M = 16;                    % 16-QAM (調變階數)
 k_bits = 4;                % 每符元位元數 (Bits per symbol)
-sps = 4;                   % Samples per Symbol (上取樣倍率)
+sps = 32;                   % Samples per Symbol (上取樣倍率)
 
 % --- RRC 脈衝成型濾波器參數 ---
 Rolloff = 0.5;
