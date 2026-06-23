@@ -6,7 +6,7 @@ Fs = 122.88e6;
 CenterFreq_MHz = 433;      
 M = 16;                    
 k_bits = 4;                
-sps = 4;                   
+sps = 32;                   
 RxTime = 0.02;             
 
 % --- RRC 濾波器 ---
@@ -25,7 +25,7 @@ ref_preamble = 1 - 2 * pn_seq;
 fprintf('\n--- 開始設定 SDR RX ---\n');
 try
     LO_CHANGE(0, CenterFreq_MHz, CenterFreq_MHz);
-    set_RX_Ref_Level_ELSDR([0 0]); % 根據簡報 P.8 設定
+    set_RX_Ref_Level_ELSDR([0 -30]); % 根據簡報 P.8 設定
     RxLen = round(RxTime * Fs);
     
     rx_data_raw = RX(1, RxLen);
